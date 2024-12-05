@@ -37,13 +37,13 @@ Python Server
 ## Installation
 1. Clone the Repository
 
-git clone https://github.com/glop/open-clock.git
+        git clone https://github.com/glop/open-clock.git
 
-cd alarm-clock
+        cd alarm-clock
 
 2. Install Python Dependencies
 
-pip install -r requirements.txt
+        pip install -r requirements.txt
 
 3. Upload Code to ESP32
 
@@ -53,7 +53,7 @@ pip install -r requirements.txt
    
     Run the Flask server:
 
-    python app.py
+        python app.py
 
 Contributing
 
