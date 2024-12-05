@@ -38,6 +38,7 @@ Python Server
 1. Clone the Repository
 
 git clone https://github.com/glop/open-clock.git
+
 cd alarm-clock
 
 2. Install Python Dependencies
