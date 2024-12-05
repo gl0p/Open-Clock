@@ -1,0 +1,9 @@
+{
+  "short_name": "Clock",
+  "name": "Clock Control Panel",
+  "start_url": "/?source=pwa",
+  "display": "standalone",
+  "theme_color": "#007BFF",
+  "background_color": "#ffffff",
+  "orientation": "portrait"
+}
