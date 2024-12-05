@@ -48,10 +48,11 @@ Python Server
 
 3. Upload Code to ESP32
 
-    Make sure the Arduino IDE settings are correct.
-        Tools >   Events Run on core 0
-                  Arduino runs on Core 1
-                  Partition Scheme: No FS 4MB (2MB APP x2)
+   Make sure the Arduino IDE settings are correct.
+
+   Tools:    Events Run on core 0
+             Arduino runs on Core 1
+             Partition Scheme: No FS 4MB (2MB APP x2)
    
     Use the Arduino IDE or PlatformIO to upload the firmware to your ESP32.
    
