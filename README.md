@@ -25,6 +25,7 @@ Open-Source: Modify and extend the functionality to meet your needs.
         Photoresistor for brightness control
         1200uF capacitor for amplifier stabilization
     Metal plate for touch sensor
+    Custom PCB and 3d printed files.
 
 ### Software Requirements
 Python Server
@@ -47,15 +48,52 @@ Python Server
 
 3. Upload Code to ESP32
 
-    Use the Arduino IDE or PlatformIO to upload the firmware to your ESP32.
-
-4. Set Up the Server
+    Make sure the Arduino IDE settings are correct.
+        Tools >   Events Run on core 0
+                  Arduino runs on CXore 1
+                  Partition Scheme: No FS 4MB (2MB APP x2)
    
-    Run the Flask server:
+    Use the Arduino IDE or PlatformIO to upload the firmware to your ESP32.
+   
 
-        python app.py
+5. Set Up the Server
 
-Contributing
+   After installing all dependencies, you should be able to run the flask server. 
+
+        python main.py
+
+## How To Use
+
+There is a detailed usermanual attached to this repository. 
+
+### TLDR; 
+
+1. The display will flash green and it is set up in AP mode.
+2. Connect to Clock_Setup wifi network.
+3. Enter wifi credentials and setup information.
+4. After setup you should be redirected to the main page.
+5. Save to your home screen or bookmark on desktop.
+6. Youtube Search and stream will be from your server.
+
+## Tweaking service workers or HTML?
+
+Clock_setup.h is plain text, easy to modify.
+
+Clock_time_bin.h needs to be a compressed binary html file and run in program memory.
+
+    gzip -9 clock_time.html
+
+    xxd -i clock_time.html.gz | sed '1i #include <pgmspace.h>' | sed 's/^unsigned /const unsigned /' | sed 's/;$/ PROGMEM;/' > clock_time_bin.h
+
+The manifest.json and serviceworker.js need to be converted to a binary file aswell.
+
+    xxd -i serviceworker.js > service-worker.h
+
+    xxd -i manifest.json > manifest_json.h
+
+Kepp all these binary files when uploading the sketch in the same directory as the .ino file.
+
+## Contributing
 
 ### We welcome contributions from the community! If you'd like to contribute, follow these steps:
 
@@ -73,4 +111,11 @@ If you use or modify this project, commercially or otherwise, you must retain th
 
 A special thanks to the open-source community for inspiring and supporting this project. 🎉
 
-Feel free to tweak this template to fit your specific project details. Let me know if you’d like help with any particular section!
+This is still in devolopment so check back regularly for new updates.
+
+Lots to come!
+
+
+
+
+    
