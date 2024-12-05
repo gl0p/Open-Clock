@@ -1,4 +1,4 @@
-About
+**About
 
 This open-source alarm clock project combines smart features with a fully customizable interface. Designed to be user-friendly and extendable, it offers features like automatic brightness adjustment, audio streaming, custom alarms, and much more.
 
