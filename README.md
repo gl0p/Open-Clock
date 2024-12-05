@@ -24,29 +24,20 @@ Open-Source: Modify and extend the functionality to meet your needs.
     Additional Components:
         Photoresistor for brightness control
         1200uF capacitor for amplifier stabilization
+    Metal plate for touch sensor
 
 ### Software Requirements
 Python Server
 
-    Backend: Flask
-    Database: PostgreSQL (for user and settings management)
+    Backend:    Flask
+                Nginx
+                Apache2
 
-### Microcontroller
-
-    Programmed using the Arduino framework, with the following libraries:
-        WiFi
-        WebServer
-        ESPmDNS
-        WiFiUdp
-        NTPClient
-        ArduinoJson
-        Adafruit_NeoPixel
-        Preferences
 
 ## Installation
 1. Clone the Repository
 
-git clone https://github.com/your-username/alarm-clock.git
+git clone https://github.com/glop/open-clock.git
 cd alarm-clock
 
 2. Install Python Dependencies
@@ -56,37 +47,28 @@ pip install -r requirements.txt
 3. Upload Code to ESP32
 
     Use the Arduino IDE or PlatformIO to upload the firmware to your ESP32.
-    Configure Wi-Fi settings and initial preferences in the config.h file.
 
 4. Set Up the Server
-
-    Install PostgreSQL and create a database for user settings and logs.
+   
     Run the Flask server:
 
     python app.py
 
 Contributing
 
-We welcome contributions from the community! If you'd like to contribute, follow these steps:
+### We welcome contributions from the community! If you'd like to contribute, follow these steps:
 
-    Fork the repository.
-    Create a new branch for your feature or bug fix.
-    Submit a pull request with a detailed description of your changes.
+Fork the repository.
+Create a new branch for your feature or bug fix.
+Submit a pull request with a detailed description of your changes.
 
 License
 
-This project is licensed under the GNU General Public License v3.0. See the LICENSE file for details.
-Attribution
+This project is licensed under the GNU General Public License v3.0.
 
-If you use or modify this project, commercially or otherwise, you must retain the original attribution to [Your Name].
-Contact
+If you use or modify this project, commercially or otherwise, you must retain the original attribution to gl0p.
 
-Have questions or ideas? Feel free to reach out:
-
-    Email: your-email@example.com
-    GitHub Issues: Submit an Issue
-
-Acknowledgments
+### Acknowledgments
 
 A special thanks to the open-source community for inspiring and supporting this project. 🎉
 
