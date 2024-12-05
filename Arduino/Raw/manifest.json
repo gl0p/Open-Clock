@@ -1,4 +1,5 @@
 {
+  "_comment": "This file is part of the open-clock Project. Licensed under GPLv3.",
   "short_name": "Clock",
   "name": "Clock Control Panel",
   "start_url": "/?source=pwa",
