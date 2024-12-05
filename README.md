@@ -56,8 +56,13 @@ Python Server
    
     Use the Arduino IDE or PlatformIO to upload the firmware to your ESP32.
    
+5. Run these commands to install the necessary system-level packages:
 
-5. Set Up the Server
+        sudo apt update
+   
+        sudo apt install -y python3 python3-pip ffmpeg
+
+6. Set Up the Server
 
    After installing all dependencies, you should be able to run the flask server. 
 
