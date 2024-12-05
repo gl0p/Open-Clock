@@ -1,6 +1,6 @@
-#Open Source Alarm Clock
+# Open Source Alarm Clock
 
-###About
+### About
 
 This open-source alarm clock project combines smart features with a fully customizable interface. Designed to be user-friendly and extendable, it offers features like automatic brightness adjustment, audio streaming, custom alarms, and much more.
 
@@ -14,7 +14,7 @@ Alarms: Set daily or weekly alarms, each with custom music and volume levels.
 Wi-Fi Integration: Automatically sync time with NTP and update settings remotely.
 Open-Source: Modify and extend the functionality to meet your needs.
 
-###Hardware Requirements
+### Hardware Requirements
 
     Microcontroller: ESP32 WROOM
     LEDs: WS2812-2020 RGB LEDs
@@ -25,13 +25,13 @@ Open-Source: Modify and extend the functionality to meet your needs.
         Photoresistor for brightness control
         1200uF capacitor for amplifier stabilization
 
-###Software Requirements
+### Software Requirements
 Python Server
 
     Backend: Flask
     Database: PostgreSQL (for user and settings management)
 
-###Microcontroller
+### Microcontroller
 
     Programmed using the Arduino framework, with the following libraries:
         WiFi
@@ -43,7 +43,7 @@ Python Server
         Adafruit_NeoPixel
         Preferences
 
-Installation
+## Installation
 1. Clone the Repository
 
 git clone https://github.com/your-username/alarm-clock.git
