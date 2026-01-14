@@ -98,7 +98,7 @@ int brightnessMappingCount = 0; // Current number of mappings
 bool manualBrightnessOverride = false;
 int userSetBrightness = -1;   // -1 indicates no manual override
 unsigned long lastLightReadingTime = 0;
-const unsigned long LIGHT_READING_INTERVAL = 15; // 40 hz (15ms +10ms delay in loop)
+const unsigned long LIGHT_READING_INTERVAL = 50; // 40 hz (15ms +10ms delay in loop)
 int findBrightnessMappingIndex(int sensorReading);
 
 int lightReadings[12];        // For averaging over 3 minutes
@@ -203,6 +203,14 @@ TimeZone timeZones[] = {
 };
 
 Audio audio;
+const int AUDIO_VOLUME_MIN = 0;
+const int AUDIO_VOLUME_MAX = 15; // enforce 15 globally
+
+static inline int clampVolume(int v) {
+    if (v < AUDIO_VOLUME_MIN) return AUDIO_VOLUME_MIN;
+    if (v > AUDIO_VOLUME_MAX) return AUDIO_VOLUME_MAX;
+    return v;
+}
 
 // Wi-Fi credentials
 String ssid;
@@ -273,6 +281,8 @@ void displayColon();
 bool disableZero24hr = false;
 bool disableZero12hr = false;
 bool disableZeroCountdown = false;
+unsigned long lastBrightnessSaveMs = 0;
+const unsigned long BRIGHTNESS_SAVE_INTERVAL_MS = 60000; // 60s
 
 uint32_t hexToRGB(const String& hexColor);
 void shutdownAPTask(void * parameter);
@@ -280,20 +290,7 @@ void shutdownAPTask(void * parameter);
 void audioTask(void * parameter){
     while(true){
         audio.loop();
-        // Serial.print("Audio Status: ");
-        // Serial.println(audio.isRunning() ? "Running" : "Stopped");
-        // static unsigned long lastPrintTime = 0;
-        // unsigned long currentTime = millis();
-        // if (currentTime - lastPrintTime >= 1000) { // Every 5 seconds
-            // UBaseType_t highWaterMark = uxTaskGetStackHighWaterMark(NULL);
-            // Serial.print("Audio Task Stack High Water Mark: ");
-            // Serial.println(highWaterMark);
-            // lastPrintTime = currentTime;
-            // Serial.print("Free heap: ");
-            // Serial.print(ESP.getFreeHeap());
-            // Serial.println(" bytes");
-        // }
-        vTaskDelay(1); // Yield to other tasks
+        vTaskDelay(pdMS_TO_TICKS(2)); // Yield to other tasks
     }
 }
 
@@ -393,7 +390,7 @@ void removeGroupPreferences(const String& groupName) {
 }
 
 void handleManualBrightnessSet(int brightness) {
-    setBrightness(brightness);
+    setBrightness(brightness, true);
     if (!autoBrightnessEnabled) {
         // Save the user-set brightness
         userSetBrightness = brightness;
@@ -553,7 +550,7 @@ void setup() {
             Serial.println("PSRAM is not available");
         }
 
-        audio.setBufsize(24 * 1024, 64 * 1024); // 24 KB RAM buffer, 64 KB PSRAM buffer
+        audio.setBufsize(20 * 1024, 64 * 1024); // 24 KB RAM buffer, 64 KB PSRAM buffer
 
         // Initialize Audio
         audio.setPinout(I2S_BCK_PIN, I2S_WS_PIN, I2S_DOUT_PIN);
@@ -570,11 +567,11 @@ void setup() {
             "AudioTask",      // Name
             6144,             // Stack size
             NULL,             // Parameters
-            8,                // Priority (higher value = higher priority)
+            2,                // Priority (higher value = higher priority)
             &audioTaskHandle, // Task handle
-            0                 // Core (0 or 1)
+            1                 // Core (0 or 1)
         );
-        WiFi.setTxPower(WIFI_POWER_2dBm);
+        WiFi.setTxPower(WIFI_POWER_15dBm);
         Serial.print("WiFi Power Level:");
         Serial.println(WiFi.getTxPower());
         // Print the signal strength
@@ -665,10 +662,6 @@ void setup() {
     server.on("/setHourFormat", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL, handleSetHourFormat);
     server.on("/getHourFormat", HTTP_GET, handleGetHourFormat);
 
-    //UPDATER
-    server.on("/getFirmwareStatus", HTTP_GET, handleGetFirmwareStatus);
-    server.on("/updateFirmware", HTTP_POST, handleUpdateFirmware);
-
     // Device settings
     server.on("/deletePreferenceGroups", HTTP_POST, [](AsyncWebServerRequest *request){}, NULL, handleDeletePreferenceGroups);
     server.on("/resetDevice", HTTP_POST, [](AsyncWebServerRequest *request) {handleResetDevice(request);});
@@ -690,152 +683,6 @@ void setup() {
     // Start the web server
     server.begin();
     Serial.println("HTTP server started");
-}
-
-// Function to handle firmware update request
-void handleUpdateFirmware(AsyncWebServerRequest *request) {
-    request->send(200, "text/plain", "Firmware update initiated. The device will restart if an update is available.");
-    xTaskCreatePinnedToCore(
-        otaTask,          // Task function
-        "OTATask",        // Name
-        8192,             // Stack size
-        NULL,             // Parameters
-        10,               // Priority (higher number = higher priority)
-        NULL,             // Task handle
-        0                 // Core (0 or 1)
-    );
-}
-
-// Function to check if a new firmware is available
-bool checkForNewFirmware() {
-    WiFiClient client;
-    String firmwareUrl = String("http://") + host + firmware_path;
-
-    Serial.printf("Connecting to %s:%d\n", host, port);
-    if (!client.connect(host, port)) {
-        Serial.println("Connection to server failed.");
-        return false;
-    }
-
-    // Send a HEAD request to check for the latest firmware
-    client.print(String("HEAD ") + firmware_path + " HTTP/1.1\r\n" +
-                 "Host: " + host + "\r\n" +
-                 "Connection: close\r\n\r\n");
-
-    // Wait for the response
-    unsigned long timeout = millis();
-    while (client.connected() && !client.available()) {
-        delay(10);
-        if (millis() - timeout > 5000) { // Timeout after 5 seconds
-            Serial.println(">>> Client Timeout!");
-            client.stop();
-            return false;
-        }
-    }
-
-    // Read the headers and look for 'Firmware-Name'
-    bool firmwareHeaderFound = false;
-    String line;
-    while (client.connected() || client.available()) {
-        line = client.readStringUntil('\n');
-        line.trim();
-        Serial.println(line);  // Debug: Print each header line
-
-        if (line.startsWith("Firmware-Name: ")) {
-            String latestFilename = line.substring(strlen("Firmware-Name: "));
-            latestFilename.trim();
-
-            String currentFilename = preferences.getString(firmwareKey, "");
-            Serial.printf("Current firmware: %s\n", currentFilename.c_str());
-            Serial.printf("Latest firmware: %s\n", latestFilename.c_str());
-
-            if (latestFilename != currentFilename) {
-                firmwareHeaderFound = true;
-                latestFirmwareName = latestFilename;
-            }
-        }
-
-        if (line.length() == 0) {
-            // Headers have ended
-            break;
-        }
-    }
-
-    client.stop();
-    return firmwareHeaderFound;
-}
-
-void performOTAUpdate() {
-    // Stop the web server to free resources
-    server.end();
-    delay(1000);
-
-    // Prepare for OTA update
-    String firmwareUrl = String("http://") + host + firmware_path;
-    Serial.printf("Starting OTA update from: %s\n", firmwareUrl.c_str());
-
-    if (audio.isRunning()) {
-        audio.stopSong();  // Stop any audio tasks
-    }
-
-    // Delete unnecessary tasks to free up memory
-    if (audioTaskHandle != NULL) {
-        vTaskDelete(audioTaskHandle);
-        audioTaskHandle = NULL;
-    }
-
-    HTTPClient http;
-    http.begin(firmwareUrl);  // Initialize HTTP connection
-    int httpCode = http.GET();  // Send GET request
-
-    if (httpCode == HTTP_CODE_OK) {
-        int contentLength = http.getSize();
-        bool canBegin = Update.begin(contentLength);
-
-        if (canBegin) {
-            WiFiClient *stream = http.getStreamPtr();
-            size_t written = 0;
-            uint8_t buffer[512];  // Buffer for chunked download
-
-            // Feed watchdog periodically and yield to avoid timeouts
-            unsigned long lastFeedTime = millis();
-            const unsigned long feedInterval = 1000;  // 1 second
-
-            // Download firmware in chunks
-            while (written < contentLength) {
-                if (millis() - lastFeedTime > feedInterval) {
-                    lastFeedTime = millis();
-                }
-
-                size_t bytes = stream->readBytes(buffer, sizeof(buffer));
-                if (bytes > 0) {
-                    Update.write(buffer, bytes);  // Write chunk to flash
-                    written += bytes;
-                } else {
-                    delay(1);  // Yield to other tasks
-                }
-            }
-
-            if (Update.end()) {
-                Serial.println("OTA Update Complete. Restarting...");
-                preferences.putString(firmwareKey, latestFirmwareName);
-                ESP.restart();
-            } else {
-                Serial.printf("OTA Error: %s\n", Update.errorString());
-            }
-        } else {
-            Serial.println("Not enough space for OTA update.");
-        }
-    } else {
-        Serial.printf("HTTP error: %d\n", httpCode);
-    }
-    http.end();  // Close the connection
-    server.begin();
-}
-
-void otaTask(void * parameter){
-    performOTAUpdate();
-    vTaskDelete(NULL); // Delete task after OTA is done
 }
 
 void handleManifestJSON(AsyncWebServerRequest *request) {
@@ -1004,8 +851,6 @@ void handleGetHourFormat(AsyncWebServerRequest *request) {
     request->send(200, "application/json", jsonResponseStr);
 }
 
-
-
 void shutdownAPTask(void * parameter) {
     // Wait for 5 seconds before shutting down the AP
     vTaskDelay(5000 / portTICK_PERIOD_MS);
@@ -1082,11 +927,12 @@ void loop() {
         if (getLocalTime(&timeInfo)) {
             currentHour = timeInfo.tm_hour;
             currentMinute = timeInfo.tm_min;
-            
-            unsigned long currentMillis = millis();
-            if (currentMillis - lastDisplayUpdate >= 20000) {
+
+            // Update display ONLY when the minute (or hour) changes
+            if (currentMinute != previousMinute || currentHour != previousHour) {
                 displayTime(currentHour, currentMinute);
-                lastDisplayUpdate = currentMillis;
+                previousMinute = currentMinute;
+                previousHour = currentHour;
             }
 
             // Handle Wi-Fi off schedule
@@ -1248,28 +1094,29 @@ void loop() {
     }
 
     if (!setup_device){
-      int touchValue = touchRead(TOUCH_PIN);
-      // int extra_touchValue = touchRead(extra_touch);
-      unsigned long currentMillis = millis();
+        unsigned long currentMillis = millis();
 
-      // Check if the touch value is below the threshold and the debounce time has passed
-      if (touchValue < 77 && !touchTriggered && (currentMillis - lastTouchTime > 3000)) {
-          lastTouchTime = currentMillis;  // Reset debounce timer
-          touchTriggered = true;  // Set the flag to prevent repeated triggering
+    //   int touchValue = touchRead(TOUCH_PIN);
+    //   // int extra_touchValue = touchRead(extra_touch);
 
-          if (audio.isRunning()) {
-              Serial.println("Stopping audio stream...");
-              audio.stopSong();  // Stop audio function
-          } else {
-              Serial.println("Starting audio stream...");
-              audio.connecttohost(streamURL.c_str());  // Start audio function
-          }
-      }
+    //   // Check if the touch value is below the threshold and the debounce time has passed
+    //   if (touchValue < 77 && !touchTriggered && (currentMillis - lastTouchTime > 3000)) {
+    //       lastTouchTime = currentMillis;  // Reset debounce timer
+    //       touchTriggered = true;  // Set the flag to prevent repeated triggering
 
-      // Reset the flag when the touch value goes above the threshold
-      if (touchValue > 78) {
-          touchTriggered = false;  // Allow new detection when the user removes their hand
-      }
+    //       if (audio.isRunning()) {
+    //           Serial.println("Stopping audio stream...");
+    //           audio.stopSong();  // Stop audio function
+    //       } else {
+    //           Serial.println("Starting audio stream...");
+    //           audio.connecttohost(streamURL.c_str());  // Start audio function
+    //       }
+    //   }
+
+    //   // Reset the flag when the touch value goes above the threshold
+    //   if (touchValue > 78) {
+    //       touchTriggered = false;  // Allow new detection when the user removes their hand
+    //   }
       // Read the light sensor every 15 seconds
       if (currentMillis - lastLightReadingTime >= LIGHT_READING_INTERVAL) {
           lastLightReadingTime = currentMillis;
@@ -1320,7 +1167,7 @@ void handleSetAutoBrightness(AsyncWebServerRequest *request, uint8_t *data, size
 
                 // Optionally, if auto brightness is disabled, set brightness to last user-set value
                 if (!autoBrightnessEnabled && userSetBrightness >= 0) {
-                    setBrightness(userSetBrightness);
+                    setBrightness(userSetBrightness, false);
                     displayTime(currentHour, currentMinute);
                 }
 
@@ -1350,7 +1197,7 @@ void adjustBrightness(int lightValue) {
 
     // Update brightness if it has changed significantly
     if (abs(newBrightness - ledBrightness) >= 5) {
-        setBrightness(newBrightness);
+        setBrightness(newBrightness, true);
         ledBrightness = newBrightness;
         displayTime(currentHour, currentMinute);
     }
@@ -1497,16 +1344,27 @@ void loadBrightnessMappings() {
     }
 }
 
-void setBrightness(int brightness) {
-    brightness = max(brightness, MINIMUM_EFFECTIVE_BRIGHTNESS);  // Ensure brightness doesn't go below the minimum
+void setBrightness(int brightness, bool persistNow) {
+    brightness = max(brightness, MINIMUM_EFFECTIVE_BRIGHTNESS);
     ledBrightness = constrain(brightness, MIN_BRIGHTNESS, MAX_BRIGHTNESS);
-    preferences.putUChar("ledBrightness", ledBrightness);
+
     strip.setBrightness(ledBrightness);
     strip.show();
 
-    // Serial.print("Brightness set to: ");
-    // Serial.println(ledBrightness);
+    if (persistNow) {
+        preferences.putUChar("ledBrightness", ledBrightness);
+        lastBrightnessSaveMs = millis();
+        return;
+    }
+
+    // Optional: periodic save (not every change)
+    unsigned long now = millis();
+    if (now - lastBrightnessSaveMs >= BRIGHTNESS_SAVE_INTERVAL_MS) {
+        preferences.putUChar("ledBrightness", ledBrightness);
+        lastBrightnessSaveMs = now;
+    }
 }
+
 
 
 // void notifyClientsBrightness() {
@@ -1516,17 +1374,6 @@ void setBrightness(int brightness) {
 //     serializeJson(doc, jsonString);
 //     wso.textAll(jsonString);
 // }
-
-// Update your handleGetFirmwareStatus function
-void handleGetFirmwareStatus(AsyncWebServerRequest *request) {
-    firmwareUpdateAvailable = checkForNewFirmware();
-    StaticJsonDocument<100> jsonResponse;
-    jsonResponse["updateAvailable"] = firmwareUpdateAvailable;
-    String jsonResponseStr;
-    serializeJson(jsonResponse, jsonResponseStr);
-    request->send(200, "application/json", jsonResponseStr);
-}
-
 
 void handleRoot(AsyncWebServerRequest *request) {
     if (WiFi.getMode() == WIFI_AP) {
@@ -1935,16 +1782,12 @@ void handleSetAudioSettings(AsyncWebServerRequest *request, uint8_t *data, size_
             // Handle volume
             if (doc.containsKey("volume")) {
                 int volume = doc["volume"];
-                if (volume >= 0 && volume <= 21) {
-                    audioVolume = volume;
-                    preferences.putInt("audioVolume", audioVolume);
-                    audio.setVolume(audioVolume);
-                    Serial.printf("Audio volume set to %d\n", audioVolume);
-                } else {
-                    request->send(400, "application/json", "{\"error\":\"Volume out of range\"}");
-                    return;
-                }
+                audioVolume = clampVolume(volume);
+                preferences.putInt("audioVolume", audioVolume);
+                audio.setVolume(audioVolume);
+                Serial.printf("Audio volume set to %d (requested %d)\n", audioVolume, volume);
             }
+
 
             // Handle streamName
             if (doc.containsKey("streamName")) {
@@ -2089,11 +1932,13 @@ void triggerAlarm(int index) {
     Serial.printf("Triggering Alarm %d at %s\n", index + 1, alarms[index].time.c_str());
 
     // Set the volume to the alarm's volume
-    audio.setVolume(alarms[index].volume);
-    isStreaming = true;
-    preferences.putBool("isStreaming", isStreaming);
-    audioVolume = alarms[index].volume;
-    preferences.putInt("audioVolume", audioVolume);
+    int v = clampVolume(alarms[index].volume);
+        audio.setVolume(v);
+        isStreaming = true;
+        preferences.putBool("isStreaming", isStreaming);
+        audioVolume = v;
+        preferences.putInt("audioVolume", audioVolume);
+
 
     alarmStreamURL = alarms[index].streamURL;
     if (alarmStreamURL.length() == 0) {
