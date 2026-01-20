@@ -25,28 +25,14 @@ Open-Source: Modify and extend the functionality to meet your needs.
         Photoresistor for brightness control
         1200uF capacitor for amplifier stabilization
     Metal plate for touch sensor
-    Custom PCB and 3d printed files.
-
-### Software Requirements
-Python Server
-
-    Backend:    Flask
-                Nginx
-                Apache2
-
+    Custom PCB and 3d printed
 
 ## Installation
 1. Clone the Repository
 
         git clone https://github.com/glop/open-clock.git
 
-        cd alarm-clock
-
-2. Install Python Dependencies
-
-        pip install -r requirements.txt
-
-3. Upload Code to ESP32
+2. Upload Code to ESP32
 
    Make sure the Arduino IDE settings are correct.
 
@@ -55,18 +41,6 @@ Python Server
              Partition Scheme: No FS 4MB (2MB APP x2)
    
     Use the Arduino IDE or PlatformIO to upload the firmware to your ESP32.
-   
-5. Run these commands to install the necessary system-level packages:
-
-        sudo apt update
-   
-        sudo apt install -y python3 python3-pip ffmpeg
-
-6. Set Up the Server
-
-   After installing all dependencies, you should be able to run the flask server. 
-
-        python main.py
 
 ## How To Use
 
